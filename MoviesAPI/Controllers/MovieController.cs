@@ -58,5 +58,119 @@ namespace MoviesAPI.Controllers
 
             return movie;
         }
+
+        [HttpGet("selectloading/{id:int}")]
+        public async Task<IActionResult> SelectLoading(int id)
+        {
+            var movieWithGenres = await _db.Movies.Select(m => new
+            {
+                Id = m.Id,
+                Title = m.Title,
+                Genres = m.Genres.Select(g => g.Name).OrderByDescending(n => n).ToList()
+            }).FirstOrDefaultAsync(m => m.Id == id);
+
+            return movieWithGenres == null ? NotFound() : Ok(movieWithGenres);
+        }
+
+        [HttpGet("explicitloading/{id:int}")]
+        public async Task<ActionResult<MovieDTO>> ExplicitLoading(int id)
+        {
+            var movie = await _db.Movies.FirstOrDefaultAsync(m => m.Id == id);
+
+            if (movie == null)
+            {
+                return NotFound();
+            }
+
+            await _db.Entry(movie).Collection(p => p.Genres).LoadAsync();
+            var genresCount = await _db.Entry(movie).Collection(p => p.Genres).Query().CountAsync();
+
+            var movieDTO = new MovieDTO
+            {
+                Id = movie.Id,
+                Title = movie.Title,
+                Genres = movie.Genres.Select(g => new GenreDTO 
+                {
+                    Id = g.Id,
+                    Name = g.Name
+                }).ToList()
+            };
+
+            return Ok(new
+            {
+                Movie = movieDTO,
+                GenresCount = genresCount
+            });
+        }
+
+        [HttpGet("groupByCinema")]
+        public async Task<ActionResult> GetGroupedByCinema()
+        {
+            var groupedMovies = await _db.Movies
+                .GroupBy(m => m.OnGoing)
+                .Select(g => new
+                {
+                    OnGoing = g.Key,
+                    Count = g.Count(),
+                    Movies = g.ToList()
+                }).ToListAsync();
+
+            return Ok(groupedMovies);
+        }
+
+        [HttpGet("groupByGenresCount")]
+        public async Task<ActionResult> GetGroupedByGenresCount()
+        {
+            var groupedMovies = await _db.Movies
+                .GroupBy(m => m.Genres.Count)
+                .Select(g => new
+                {
+                    Count = g.Key,
+                    Titles = g.Select(m => m.Title),
+                    Genres = g.Select(m => m.Genres).SelectMany(a => a).Select(ge => ge.Name).Distinct()
+                }).ToListAsync();
+                
+
+            return Ok(groupedMovies);
+        }
+
+        [HttpGet("filter")]
+        public async Task<ActionResult<IEnumerable<MovieDTO>>> Filter([FromQuery] MovieFilterDTO movieFilterDTO)
+        {
+            var moviesQueryable = _db.Movies.AsQueryable();
+
+            if (!String.IsNullOrWhiteSpace(movieFilterDTO.Title))
+            {
+                moviesQueryable = moviesQueryable.Where(m => m.Title.Contains(movieFilterDTO.Title));
+            }
+
+            if (movieFilterDTO.OnGoing)
+            {
+                moviesQueryable = moviesQueryable.Where(m => m.OnGoing);
+            }
+
+            if (movieFilterDTO.UpComingReleases)
+            {
+                moviesQueryable = moviesQueryable.Where(m => m.ReleaseDate > DateTime.Today);
+            }
+
+            if (movieFilterDTO.GenreId != 0)
+            {
+                moviesQueryable = moviesQueryable.Where(m => m.Genres.Select(g => g.Id).Contains(movieFilterDTO.GenreId));
+            }
+
+            var movies = await moviesQueryable.Include(m => m.Genres).ToListAsync();
+
+            return movies.Select(m => new MovieDTO
+            {
+                Id = m.Id,
+                Title = m.Title,
+                Genres = m.Genres.Select(g => new GenreDTO
+                {
+                    Id = g.Id,
+                    Name = g.Name
+                }).ToList()
+            }).ToList();
+        }
     }
 }
