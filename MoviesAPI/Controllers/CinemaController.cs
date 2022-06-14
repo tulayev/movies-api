@@ -48,5 +48,32 @@ namespace MoviesAPI.Controllers
 
             return Ok(cinemas);
         }
+
+        [HttpPost]
+        public async Task<ActionResult> Post(CinemaCreationDTO cinemaCreationDTO)
+        {
+            var geometryFactory = NtsGeometryServices.Instance.CreateGeometryFactory(srid: 4326);
+
+            var cinema = new Cinema
+            {
+                Name = cinemaCreationDTO.Nmae,
+                Location = geometryFactory.CreatePoint(new Coordinate(cinemaCreationDTO.Longtitude, cinemaCreationDTO.Latitude)),
+                CinemaOffer = new CinemaOffer
+                {
+                    DiscountPercentage = cinemaCreationDTO.CinemaOffer.DiscountPercentage,
+                    Begin = cinemaCreationDTO.CinemaOffer.Begin,
+                    End = cinemaCreationDTO.CinemaOffer.End
+                },
+                CinemHalls = cinemaCreationDTO.CinemaHalls.Select(ch => new CinemaHall
+                {
+                    Cost = ch.Cost,
+                    CinemaHallType = ch.CinemaHallType
+                }).ToList()
+            };
+
+            _db.Cinemas.Add(cinema);
+            await _db.SaveChangesAsync();
+            return Ok();
+        }
     }
 }
