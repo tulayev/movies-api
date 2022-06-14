@@ -75,5 +75,38 @@ namespace MoviesAPI.Controllers
             await _db.SaveChangesAsync();
             return Ok();
         }
+        
+        [HttpPut("{id:int}")]
+        public async Task<ActionResult> Put(CinemaCreationDTO cinemaCreationDTO, int id)
+        {
+            var geometryFactory = NtsGeometryServices.Instance.CreateGeometryFactory(srid: 4326);
+            
+            var cinemDb = await _db.Cinemas
+                .Include(c => c.CinemHalls)
+                .Include(c => c.CinemaOffer)
+                .FirstOrDefaultAsync(c => c.Id == id);
+
+            if (cinemDb == null)
+            {
+                return NotFound();
+            }
+
+            cinemDb.Name = cinemaCreationDTO.Nmae;
+            cinemDb.Location = geometryFactory.CreatePoint(new Coordinate(cinemaCreationDTO.Longtitude, cinemaCreationDTO.Latitude));
+            cinemDb.CinemaOffer = new CinemaOffer
+            {
+                DiscountPercentage = cinemaCreationDTO.CinemaOffer.DiscountPercentage,
+                Begin = cinemaCreationDTO.CinemaOffer.Begin,
+                End = cinemaCreationDTO.CinemaOffer.End
+            };
+            cinemDb.CinemHalls = cinemaCreationDTO.CinemaHalls.Select(ch => new CinemaHall
+            {
+                Cost = ch.Cost,
+                CinemaHallType = ch.CinemaHallType
+            }).ToList();
+
+            await _db.SaveChangesAsync();
+            return Ok();
+        }
     }
 }

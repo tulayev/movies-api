@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using MoviesAPI.Data;
 using MoviesAPI.DTO;
+using MoviesAPI.Models;
 
 namespace MoviesAPI.Controllers
 {
@@ -171,6 +172,39 @@ namespace MoviesAPI.Controllers
                     Name = g.Name
                 }).ToList()
             }).ToList();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Post(MovieCreationDTO movieCreationDTO)
+        {
+            var movie = new Movie
+            {
+                Title = movieCreationDTO.Title,
+                OnGoing = movieCreationDTO.OnGoing,
+                ReleaseDate = movieCreationDTO.ReleaseDate,
+                Genres = movieCreationDTO.GenreIds.Select(id => new Genre { Id = id }).ToList(),
+                CinemaHalls = movieCreationDTO.CinemaHallIds.Select(id => new CinemaHall { Id = id }).ToList(),
+                ActorsMovies = movieCreationDTO.ActorsMovies.Select(am => new ActorMovie
+                {
+                    ActorId = am.ActorId,
+                    Character = am.Character
+                }).ToList()
+            };
+
+            movie.Genres.ForEach(g => _db.Entry(g).State = EntityState.Unchanged);
+            movie.CinemaHalls.ForEach(ch => _db.Entry(ch).State = EntityState.Unchanged);
+
+            if (movie.ActorsMovies != null)
+            {
+                for (int i = 0; i < movie.ActorsMovies.Count; i++)
+                {
+                    movie.ActorsMovies[i].Order = i + 1;
+                }
+            }
+            
+            _db.Movies.Add(movie);
+            await _db.SaveChangesAsync();
+            return Ok(movie);
         }
     }
 }

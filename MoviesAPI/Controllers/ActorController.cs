@@ -34,5 +34,21 @@ namespace MoviesAPI.Controllers
         {
             return await _db.Actors.Select(a => a.Id).ToListAsync();
         }
+
+        [HttpPost]
+        public async Task<ActionResult> Post(ActorCreationDTO actorCreationDTO)
+        {
+            var actor = new Actor
+            {
+                Name = actorCreationDTO.Name,
+                Biography = actorCreationDTO.Biography,
+                DateOfBirth = actorCreationDTO.DateOfBirth
+            };
+
+            _db.Actors.Add(actor);  
+            await _db.SaveChangesAsync();
+
+            return Ok(actor);
+        }
     }
 }
